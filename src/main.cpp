@@ -1171,46 +1171,65 @@ void loop() {
         else /* resetOpen */  { resetSel    = hit; applyReset(hit); }
       }
     }
-  } else if (displayMode == DISP_INFO && tap(W - 60, 0, 60, 70)) {
-    // Top-right corner → next info page (mirrors BtnB)
-    beep(2400, 30);
-    infoPage = (infoPage + 1) % INFO_PAGES;
-  } else if (displayMode == DISP_PET && tap(W - 60, 0, 60, 70)) {
-    beep(2400, 30);
-    petPage = (petPage + 1) % PET_PAGES;
-    applyDisplayMode();
-  } else if (displayMode == DISP_NORMAL && !tpClocking && tap(12, 20, W - 24, 110)) {
-    // Tap buddy body → heart reaction (HUD only; clock mode uses swipe).
-    triggerOneShot(P_HEART, 2000);
-    _playfulUntil = millis() + PLAYFUL_MS;
-    characterInvalidate();
-    if (buddyMode) buddyInvalidate();
-    beep(2400, 50);
-  } else if (displayMode == DISP_NORMAL && !tpClocking && tap(0, H - 32, W, 32)) {
-    // Bottom strip → scroll transcript back (mirrors BtnB short-press)
-    beep(2400, 30);
-    msgScroll = (msgScroll >= 30) ? 0 : msgScroll + 1;
   }
+  // END of press-based approval/overlay taps. Below: release-based classifier
+  // for DISP_NORMAL / DISP_PET / DISP_INFO (vertical swipe cycles mode,
+  // horizontal swipe in clock mode cycles species, stationary tap routes
+  // to region-specific actions). Approval and overlay menus are excluded
+  // so an accidental drag can't mis-decide.
 
-  // Clock-mode gestures on release: horizontal swipe → species, near-stationary
-  // tap in the buddy region → heart. Release-based classification so the two
-  // gestures don't race with press-based handlers above.
-  if (tpClocking && tp.justReleased) {
-    int dx = tp.x - _tpStartX;
-    int dy = tp.y - _tpStartY;
+  if (tp.justReleased
+      && !inPrompt && !menuOpen && !settingsOpen && !resetOpen
+      && !napping && !screenOff) {
+    int dx = (int)tp.x - _tpStartX;
+    int dy = (int)tp.y - _tpStartY;
     uint32_t dt = millis() - _tpStartMs;
-    if (abs(dx) >= 40 && abs(dx) > abs(dy) * 2 && dt < 500) {
+
+    if (abs(dy) >= 40 && abs(dy) > abs(dx) * 2 && dt < 500) {
+      // Vertical swipe → cycle displayMode (up = next, down = previous).
+      beep(1800, 30);
+      if (dy < 0) displayMode = (displayMode + 1) % DISP_COUNT;
+      else        displayMode = (displayMode + DISP_COUNT - 1) % DISP_COUNT;
+      applyDisplayMode();
+    }
+    else if (tpClocking && abs(dx) >= 40 && abs(dx) > abs(dy) * 2 && dt < 500) {
+      // Horizontal swipe in clock mode → cycle species (unchanged behaviour).
       beep(2400, 30);
       if (dx > 0) nextPet(); else prevPet();
       _playfulUntil = millis() + PLAYFUL_MS;
-    } else if (abs(dx) < 12 && abs(dy) < 12 && dt < 800 &&
-               _tpStartY < 130) {
-      // Upper half = buddy region; lower half is the clock digits.
-      triggerOneShot(P_HEART, 2000);
-      _playfulUntil = millis() + PLAYFUL_MS;
-      characterInvalidate();
-      if (buddyMode) buddyInvalidate();
-      beep(2400, 50);
+    }
+    else if (abs(dx) < 12 && abs(dy) < 12 && dt < 800) {
+      // Stationary tap → route by press-start position.
+      if (displayMode == DISP_INFO && tappedFrom(W - 60, 0, 60, 70)) {
+        beep(2400, 30);
+        infoPage = (infoPage + 1) % INFO_PAGES;
+      }
+      else if (displayMode == DISP_PET && tappedFrom(W - 60, 0, 60, 70)) {
+        beep(2400, 30);
+        petPage = (petPage + 1) % PET_PAGES;
+        applyDisplayMode();
+      }
+      else if (displayMode == DISP_NORMAL && !tpClocking && tappedFrom(12, 20, W - 24, 110)) {
+        // Tap buddy body → heart reaction (HUD; clock mode uses the block below).
+        triggerOneShot(P_HEART, 2000);
+        _playfulUntil = millis() + PLAYFUL_MS;
+        characterInvalidate();
+        if (buddyMode) buddyInvalidate();
+        beep(2400, 50);
+      }
+      else if (displayMode == DISP_NORMAL && !tpClocking && tappedFrom(0, H - 32, W, 32)) {
+        // Bottom strip → scroll transcript back (mirrors BtnB short-press).
+        beep(2400, 30);
+        msgScroll = (msgScroll >= 30) ? 0 : msgScroll + 1;
+      }
+      else if (tpClocking && _tpStartY < 130) {
+        // Clock mode upper half = buddy region (lower half is clock digits).
+        triggerOneShot(P_HEART, 2000);
+        _playfulUntil = millis() + PLAYFUL_MS;
+        characterInvalidate();
+        if (buddyMode) buddyInvalidate();
+        beep(2400, 50);
+      }
     }
   }
 
