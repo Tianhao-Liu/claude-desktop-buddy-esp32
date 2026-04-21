@@ -1,10 +1,14 @@
+// src/hw/expander.h
 #pragma once
+#include "hw/pins.h"
+
+#if BOARD_HAS_TCA9554
 #include <Adafruit_XCA9554.h>
-
-// Shared TCA9554 instance. Initialised by hwExpanderInit() before any
-// driver that needs LCD/TP reset or AXP IRQ access.
+// Shared TCA9554 instance — used by expander.cpp only;
+// other hw/ files go through hwExpanderAxpIrqLow() etc.
 extern Adafruit_XCA9554 g_expander;
+#endif
 
-bool hwExpanderInit();          // returns false on I2C failure
-void hwExpanderResetSequence(); // pull EXIO 0/1/2 low → 20ms → high
-bool hwExpanderAxpIrqLow();     // true while AXP IRQ pin is asserted
+bool hwExpanderInit();          // false on I2C failure (TCA9554 path) or never fails (direct GPIO path)
+void hwExpanderResetSequence(); // pull LCD_RESET + TP_RESET low → 20ms → high
+bool hwExpanderAxpIrqLow();     // true while AXP IRQ is asserted; always true on 1.75C (poll via I2C)
