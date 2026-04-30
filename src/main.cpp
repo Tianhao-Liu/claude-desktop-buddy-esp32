@@ -195,6 +195,37 @@ void applyDisplayMode() {
   characterInvalidate();  // redraws character on next tick (text mode path)
 }
 
+// Swipe cycles through all 9 pages as a flat list:
+//   Normal → Pet 1/2 → Pet 2/2 → Info 1/6 → … → Info 6/6 → (wrap to Normal)
+// Key1 short-press keeps the coarser 3-mode cycle; these helpers are only
+// wired into the release-based gesture classifier below.
+// applyDisplayMode() fires on mode transitions and Pet sub-page (matches
+// existing BtnB behaviour). Info sub-page skips it because drawInfo() clears
+// its own region — also matches existing BtnB behaviour.
+static void swipeNextPage() {
+  if (displayMode == DISP_NORMAL) {
+    displayMode = DISP_PET; petPage = 0;                  applyDisplayMode();
+  } else if (displayMode == DISP_PET) {
+    if (petPage + 1 < PET_PAGES)    { petPage++;          applyDisplayMode(); }
+    else { displayMode = DISP_INFO; infoPage = 0;         applyDisplayMode(); }
+  } else { /* DISP_INFO */
+    if (infoPage + 1 < INFO_PAGES)  { infoPage++; }
+    else { displayMode = DISP_NORMAL;                     applyDisplayMode(); }
+  }
+}
+
+static void swipePrevPage() {
+  if (displayMode == DISP_NORMAL) {
+    displayMode = DISP_INFO; infoPage = INFO_PAGES - 1;   applyDisplayMode();
+  } else if (displayMode == DISP_PET) {
+    if (petPage > 0)                { petPage--;          applyDisplayMode(); }
+    else { displayMode = DISP_NORMAL;                     applyDisplayMode(); }
+  } else { /* DISP_INFO */
+    if (infoPage > 0)               { infoPage--; }
+    else { displayMode = DISP_PET; petPage = PET_PAGES - 1; applyDisplayMode(); }
+  }
+}
+
 const char* menuItems[] = { "settings", "turn off", "help", "about", "demo", "close" };
 const uint8_t MENU_N = 6;
 
@@ -602,34 +633,30 @@ void drawInfo() {
     bool linked = settings().bt && dataBtActive();
 
     spr.setTextColor(linked ? GREEN : (settings().bt ? HOT : p.textDim), p.bg);
-    spr.setTextSize(2);
-    spr.setCursor(SAFE_L, y);
-    spr.print(linked ? "linked" : (settings().bt ? "discover" : "off"));
-    spr.setTextSize(1);
-    y += 20;
+    ln("%s", linked ? "linked" : (settings().bt ? "discover" : "off"));
+    y += 4;
 
-    spr.setTextColor(p.textDim, p.bg);
     spr.setTextColor(p.text, p.bg);
-    ln("  %s", btName);
+    ln("%s", btName);
     spr.setTextColor(p.textDim, p.bg);
     uint8_t mac[6] = {0};
     esp_read_mac(mac, ESP_MAC_BT);
-    ln("  %02X:%02X:%02X:%02X:%02X:%02X",
+    ln("%02X:%02X:%02X:%02X:%02X:%02X",
        mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
-    y += 8;
+    y += 4;
 
     if (linked) {
       uint32_t age = (millis() - tama.lastUpdated) / 1000;
-      ln("  last msg  %lus", (unsigned long)age);
+      ln("last msg  %lus", (unsigned long)age);
     } else if (settings().bt) {
       spr.setTextColor(p.text, p.bg);
       ln("TO PAIR");
       spr.setTextColor(p.textDim, p.bg);
-      ln(" Open Claude desktop");
-      ln(" > Developer");
-      ln(" > Hardware Buddy");
+      ln("Open Claude desktop");
+      ln("> Developer");
+      ln("> Hardware Buddy");
       y += 4;
-      ln(" auto-connects via BLE");
+      ln("auto-connects via BLE");
     }
 
   } else {
@@ -641,17 +668,17 @@ void drawInfo() {
     ln("Felix Rieseberg");
     y += 12;
     spr.setTextColor(p.textDim, p.bg);
-    ln("source");
+    ln("hardware adaptation");
     y += 4;
     spr.setTextColor(p.text, p.bg);
-    ln("github.com/anthropics");
-    ln("/claude-desktop-buddy");
+    ln("yadong");
     y += 12;
     spr.setTextColor(p.textDim, p.bg);
     ln("hardware");
     y += 4;
-    ln("M5StickC Plus");
-    ln("ESP32 + AXP192");
+    spr.setTextColor(p.text, p.bg);
+    ln(BOARD_MODEL_LINE1);
+    ln(BOARD_MODEL_LINE2);
   }
 }
 
@@ -1186,11 +1213,11 @@ void loop() {
     uint32_t dt = millis() - _tpStartMs;
 
     if (abs(dy) >= 40 && abs(dy) > abs(dx) * 2 && dt < 500) {
-      // Vertical swipe → cycle displayMode (up = next, down = previous).
+      // Vertical swipe → advance one step in the flat 9-page cycle
+      // (up = next, down = previous). Key1 keeps the coarser 3-mode cycle.
       beep(1800, 30);
-      if (dy < 0) displayMode = (displayMode + 1) % DISP_COUNT;
-      else        displayMode = (displayMode + DISP_COUNT - 1) % DISP_COUNT;
-      applyDisplayMode();
+      if (dy < 0) swipeNextPage();
+      else        swipePrevPage();
     }
     else if (tpClocking && abs(dx) >= 40 && abs(dx) > abs(dy) * 2 && dt < 500) {
       // Horizontal swipe in clock mode → cycle species (unchanged behaviour).

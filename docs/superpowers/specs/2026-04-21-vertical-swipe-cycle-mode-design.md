@@ -11,18 +11,26 @@ implemented: in *clock* mode (Normal + idle + RTC synced) a horizontal
 swipe cycles the ASCII species; everywhere else, tap actions fire on
 `justPressed`. No release-based classification exists outside clock mode.
 
-This spec adds **vertical swipe to cycle `displayMode`** across Normal /
-Pet / Info, matching the button behavior and giving the 1.75C round panel
-(where buttons are less discoverable) a first-class gesture.
+This spec adds **vertical swipe to cycle through every page** of the
+three top-level modes (Normal, Pet × 2 sub-pages, Info × 6 sub-pages —
+nine pages total), giving the 1.75C round panel (where buttons are less
+discoverable) a first-class gesture.
+
+> **Revision 2026-04-21:** initial design had swipe cycle only the three
+> top-level `displayMode` values (matching Key1). Revised to swipe through
+> all 9 pages as a flat list — Key1 remains the coarse mode jumper.
 
 ## Goals
 
-- Swipe up / down anywhere on Normal / Pet / Info → switch mode
+- Swipe up / down cycles through all 9 pages as a flat list:
+  `Normal → Pet 1/2 → Pet 2/2 → Info 1/6 → … → Info 6/6 → Normal`
+- Key1 short-press keeps the coarse 3-mode cycle (Normal / Pet / Info)
+- BtnB short-press and Pet/Info top-right tap keep sub-page cycling
+  within the current mode (unchanged)
 - Existing horizontal swipe-species (clock) keeps working
-- Existing tap semantics (buddy-heart, transcript scroll, page corner)
-  keep working
+- Existing tap semantics (buddy-heart, transcript scroll) keep working
 - Approval prompt and overlay menus remain gesture-safe (no accidental
-  mode switches during a decision)
+  page switches during a decision)
 
 ## Out of Scope
 
@@ -51,7 +59,7 @@ Then classify **in this order** (first match wins):
 
 | Class | Condition | Action |
 |---|---|---|
-| Vertical swipe | `abs(dy) ≥ 40 && abs(dy) > 2·abs(dx) && dt < 500` | Cycle `displayMode`: `dy < 0` → next, `dy > 0` → previous. Beep `(1800, 30)`. Call `applyDisplayMode()`. |
+| Vertical swipe | `abs(dy) ≥ 40 && abs(dy) > 2·abs(dx) && dt < 500` | Advance one step in the flat 9-page cycle: `dy < 0` → next, `dy > 0` → previous. Beep `(1800, 30)`. See **Page Cycle** below. |
 | Horizontal swipe (clock only) | `tpClocking && abs(dx) ≥ 40 && abs(dx) > 2·abs(dy) && dt < 500` | Existing `nextPet()` / `prevPet()` + playful window (unchanged logic) |
 | Stationary tap | `abs(dx) < 12 && abs(dy) < 12 && dt < 800` | Route by `_tpStartX` / `_tpStartY` to the original region-specific tap action |
 
@@ -77,19 +85,47 @@ unchanged:
 
 ---
 
-## Mode Cycle
+## Page Cycle
+
+Swipe cycles through every page as a flat list:
 
 ```
-DISP_NORMAL  ──up──▶  DISP_PET  ──up──▶  DISP_INFO
-    ▲                                        │
-    └────────────────up──────────────────────┘
+Normal ──▶ Pet 1/2 ──▶ Pet 2/2 ──▶ Info 1/6 ──▶ Info 2/6 ──▶ … ──▶ Info 6/6
+   ▲                                                                    │
+   └────────────────────────── up wraps ────────────────────────────────┘
 
-(down reverses each arrow)
+(down reverses — every arrow.)
 ```
 
-Matches the Key1 short-press cycle (`displayMode = (displayMode + 1) %
-DISP_COUNT`). `applyDisplayMode()` must fire so any per-mode setup is
-run — same as the button path.
+Two helpers own this logic, one file-scope in `main.cpp`:
+
+```cpp
+static void swipeNextPage() {
+  if (displayMode == DISP_NORMAL) {
+    displayMode = DISP_PET;  petPage = 0;                  applyDisplayMode();
+  } else if (displayMode == DISP_PET) {
+    if (petPage + 1 < PET_PAGES) { petPage++;              applyDisplayMode(); }
+    else { displayMode = DISP_INFO; infoPage = 0;          applyDisplayMode(); }
+  } else { /* DISP_INFO */
+    if (infoPage + 1 < INFO_PAGES) { infoPage++; }
+    else { displayMode = DISP_NORMAL;                      applyDisplayMode(); }
+  }
+}
+static void swipePrevPage() { /* mirror */ }
+```
+
+`applyDisplayMode()` fires on mode transitions (matches existing Key1
+behaviour) and Pet sub-page transitions (matches existing BtnB behaviour);
+it is skipped for Info sub-page transitions (also matches existing BtnB).
+The asymmetry is preserved because Pet's `drawPet()` leaves the top 70 px
+untouched whereas Info's `drawInfo()` clears its whole region.
+
+Key1 short-press is **not** changed — it keeps the coarse 3-mode cycle
+(`displayMode = (displayMode + 1) % DISP_COUNT`). Gesture = fine-grained
+navigation; button = coarse navigation. Mental model: Cmd+Tab vs Tab.
+
+BtnB short-press and the Pet/Info top-right corner tap are also
+**unchanged** — they cycle sub-page within the current mode.
 
 ---
 
