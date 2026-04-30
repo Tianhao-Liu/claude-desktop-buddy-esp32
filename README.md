@@ -7,7 +7,7 @@ maker devices over BLE, so developers and makers can build hardware that
 displays permission prompts, recent messages, and other interactions.
 
 This is a port of [anthropics/claude-desktop-buddy](https://github.com/anthropics/claude-desktop-buddy)
-(originally targeting M5StickC Plus) to three Waveshare ESP32 AMOLED
+(originally targeting M5StickC Plus) to four Waveshare ESP32 AMOLED
 boards. The BLE wire protocol is unchanged — same pairing, same desktop
 apps, just a larger screen.
 
@@ -17,23 +17,23 @@ apps, just a larger screen.
 
 ## Supported boards
 
-All three run the **same main.cpp / UI** — board-specific wiring, drivers and
+All four run the **same main.cpp / UI** — board-specific wiring, drivers and
 canvas→panel scaling are isolated in `src/hw/` + one header per board
 under `src/boards/`.
 
-| | [ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.8) | [ESP32-S3-Touch-AMOLED-1.75C](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75C) | [ESP32-C6-Touch-AMOLED-2.16](https://www.waveshare.com/wiki/ESP32-C6-Touch-AMOLED-2.16) |
-| --- | --- | --- | --- |
-| MCU | ESP32-S3R8 (8 MB OPI PSRAM, 8 MB flash) | same | ESP32-C6FH8 (160 MHz RISC-V single-core, 8 MB flash, **no PSRAM**) |
-| Panel | 1.8" **rectangular** 368×448 AMOLED | 1.75" **round** 466×466 AMOLED | 2.16" **rounded-square** 480×480 AMOLED |
-| Display driver | SH8601 (QSPI) | CO5300 (QSPI) | SH8601 (QSPI) |
-| Touch | FT3168 @ 0x38 | CST92xx @ 0x5A | CST9217 @ 0x5A |
-| GPIO expander | TCA9554 (LCD/TP resets routed through it) | none — resets are direct GPIOs | none — resets are direct GPIOs |
-| RTC | PCF85063 (I²C) | none — software clock synced from desktop | PCF85063 (I²C) |
-| IMU | QMI8658 | same | same |
-| PMU | AXP2101 | same | same |
-| Audio | ES8311 + amp + speaker | same | ES8311 + ES7210 (output + mic codec) |
-| Buttons | Key1 (GPIO0 BOOT) + AXP PEK | same (physical layout swapped; corrected in firmware) | three: PWR/IO10/BOOT; PWR is active-HIGH via MOSFET inverter + AXP PWRON |
-| Canvas → panel | 184×224 canvas → **2× nearest-neighbor** → 368×448 | 184×224 canvas → **1.5× bilinear** → 276×336 centred in 466×466 (black border) | 184×224 canvas → **2× nearest-neighbor** → 368×448 centred at (56, 16) in 480×480 (56 px L/R / 16 px T/B black border) |
+| | [ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.8) | [ESP32-S3-Touch-AMOLED-1.75C](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75C) | [ESP32-C6-Touch-AMOLED-2.16](https://www.waveshare.com/wiki/ESP32-C6-Touch-AMOLED-2.16) | [ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-2.16) |
+| --- | --- | --- | --- | --- |
+| MCU | ESP32-S3R8 (8 MB OPI PSRAM, 8 MB flash) | same | ESP32-C6FH8 (160 MHz RISC-V single-core, 8 MB flash, **no PSRAM**) | ESP32-S3R8 (8 MB OPI PSRAM, 8 MB flash) |
+| Panel | 1.8" **rectangular** 368×448 AMOLED | 1.75" **round** 466×466 AMOLED | 2.16" **rounded-square** 480×480 AMOLED | 2.16" **rounded-square** 480×480 AMOLED (**rotated 90°**) |
+| Display driver | SH8601 (QSPI) | CO5300 (QSPI) | SH8601 (QSPI) | CO5300 (QSPI) |
+| Touch | FT3168 @ 0x38 | CST92xx @ 0x5A | CST9217 @ 0x5A | CST9217 @ 0x5A |
+| GPIO expander | TCA9554 (LCD/TP resets routed through it) | none — resets are direct GPIOs | none — resets are direct GPIOs | none — resets are direct GPIOs |
+| RTC | PCF85063 (I²C) | none — software clock synced from desktop | PCF85063 (I²C) | PCF85063 (I²C) |
+| IMU | QMI8658 | same | same | same |
+| PMU | AXP2101 | same | same | same |
+| Audio | ES8311 + amp + speaker | same | ES8311 + ES7210 (output + mic codec) | same |
+| Buttons | Key1 (GPIO0 BOOT) + AXP PEK | same (physical layout swapped; corrected in firmware) | three: PWR/IO10/BOOT; PWR is active-HIGH via MOSFET inverter + AXP PWRON | three: PWR/IO18/BOOT; PWR is active-HIGH via BSS138 inverter |
+| Canvas → panel | 184×224 canvas → **2× nearest-neighbor** → 368×448 | 184×224 canvas → **1.5× bilinear** → 276×336 centred in 466×466 (black border) | 184×224 canvas → **2× nearest-neighbor** → 368×448 centred at (56, 16) in 480×480 (56 px L/R / 16 px T/B black border) | 184×224 canvas → **2× bilinear** → 368×448 letterbox at (56, 16) in 480×480 (56 px L/R / 16 px T/B black border) |
 
 Internal canvas is **184×224** on all three. The 1.75C rounds the content
 inside its circular bezel; keeping the logical canvas identical means
@@ -57,6 +57,9 @@ pio run -e waveshare-esp32s3-touch-amoled-1-75c -t upload
 
 # 2.16" rounded-square AMOLED (ESP32-C6)
 pio run -e waveshare-esp32c6-touch-amoled-2-16 -t upload
+
+# 2.16" rounded-square AMOLED (ESP32-S3)
+pio run -e waveshare-esp32s3-touch-amoled-2-16 -t upload
 ```
 
 If you're starting from a previously-flashed device (e.g. the factory
@@ -130,6 +133,23 @@ The board has three physical keys:
 | **Shake**                | dizzy                |             |             | —           |
 | **Face-down**            | nap (energy refills) |             |             |             |
 
+### ESP32-S3-Touch-AMOLED-2.16 controls
+
+The board has three physical keys:
+- **PWR** (middle) — primary action / confirm (= A button)
+- **IO18** (left) — secondary / back / scroll (= B button)
+- **BOOT** (right) — open menu shortcut
+
+|                          | Normal               | Pet         | Info        | Approval    |
+| ------------------------ | -------------------- | ----------- | ----------- | ----------- |
+| **PWR** (middle)         | next screen          | next screen | next screen | **approve** |
+| **IO18** (left, short)   | scroll transcript    | next page   | next page   | **deny**    |
+| **Hold PWR**             | menu                 | menu        | menu        | menu        |
+| **BOOT** (right)         | open menu (shortcut) | open menu   | open menu   | open menu   |
+| **PWR held 4 s**         | power off (AXP cuts ALDO3; press again to wake) |             |             |             |
+| **Shake**                | dizzy                |             |             | —           |
+| **Face-down**            | nap (energy refills) |             |             |             |
+
 Touch is supplemental — keys remain primary:
 
 - **Swipe up / down** — cycle through all 9 pages (Normal → Pet ×2 → Info ×6). Key1 short-press remains a coarser 3-mode jumper.
@@ -161,6 +181,7 @@ Any key press or screen tap wakes the panel.
 - **Other UI strings stay ASCII** — non-ASCII bytes in `msg`, `promptTool`
   and `promptHint` are replaced with random Matrix-rain symbols rather
   than rendering as garbage glyphs
+- **ESP32-S3 2.16" rotation** — the Waveshare ESP32-S3-Touch-AMOLED-2.16 panel is physically mounted 90° rotated from its natural orientation; this is handled in firmware via MADCTL=0xA0 and is transparent to the UI code
 
 ## Per-state animations
 
