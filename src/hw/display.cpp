@@ -186,9 +186,13 @@ void hwDisplayPush() {
   for (int y = 0; y < HW_H; y++) {
     uint16_t* row = src + y * HW_W;
     for (int x = 0; x < HW_W; x++) {
+      // Byte-swap on the way in: writeBytes() emits raw bytes, but the
+      // SH8601 expects MSB-first RGB565 per MIPI DCS. draw16bitRGBBitmap()
+      // does this swap internally; writeBytes() doesn't.
       uint16_t c = row[x];
-      s_lineBuf[x*2]     = c;
-      s_lineBuf[x*2 + 1] = c;
+      uint16_t s = (uint16_t)((c >> 8) | (c << 8));
+      s_lineBuf[x*2]     = s;
+      s_lineBuf[x*2 + 1] = s;
     }
     // Each canvas row writes twice for 2× vertical expansion.
     // Width is HW_W*2 px = 368 px = 736 bytes.
