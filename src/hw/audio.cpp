@@ -21,7 +21,15 @@ extern "C" {
 
 static constexpr int AUDIO_SR  = 16000;
 static constexpr int AUDIO_VOL = 85;
-static constexpr int AUDIO_AMP = 14000;
+// Beep amplitude is runtime-adjustable via the device Settings > volume.
+// Level 0 = mute .. 4 = loud. Default level 2.
+static const int AMP_LUT[5] = { 0, 4000, 8000, 13000, 20000 };
+static int s_amp = AMP_LUT[2];
+
+void hwAudioSetVolume(uint8_t level) {
+  if (level > 4) level = 4;
+  s_amp = AMP_LUT[level];
+}
 
 static QueueHandle_t s_beepQ = nullptr;
 struct BeepReq { uint16_t freq; uint16_t dur; };
@@ -81,7 +89,7 @@ static void beepTask(void*) {
       int chunk = total - n;
       if (chunk > 256) chunk = 256;
       for (int i = 0; i < chunk; i++) {
-        buf[i] = (int16_t)(AUDIO_AMP * sinf(phase));
+        buf[i] = (int16_t)(s_amp * sinf(phase));
         phase += dphase;
         if (phase > 2*M_PI) phase -= 2*M_PI;
       }
