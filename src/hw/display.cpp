@@ -53,10 +53,18 @@ bool hwDisplayInit() {
     PIN_LCD_SDIO2, PIN_LCD_SDIO3);
 #if BOARD_DISPLAY_CO5300
   // CO5300 ctor: (bus, rst, rotation, w, h, col_off1, row_off1, col_off2, row_off2)
-  // col_offset1 = 6 on round 466×466 (1.75c), 0 on rounded-square 480×480 (S3-2.16).
-  // Pass PIN_LCD_RESET so the driver does its own 200 ms hardware reset —
-  // the 20 ms pulse from hwExpanderResetSequence() is too short for CO5300.
-  s_gfx = new Arduino_CO5300(s_bus, PIN_LCD_RESET, BOARD_DISPLAY_ROTATION,
+  // col_offset1 = 6 on round 466×466 (1.75c), 0 on rounded-square 480×480 (S3-2.16),
+  // 16 on the rectangular 368×448 (S3-1.8 V2).
+  // Reset pin: on boards with a direct LCD_RST GPIO (1.75c) pass PIN_LCD_RESET so
+  // the driver does its own 200 ms hardware reset. On the 1.8 V2 the reset line is
+  // behind the TCA9554 expander (already pulsed by hwExpanderResetSequence()), so
+  // pass GFX_NOT_DEFINED to skip the driver's pin toggle.
+#if BOARD_HAS_TCA9554
+  const int8_t co5300Rst = GFX_NOT_DEFINED;
+#else
+  const int8_t co5300Rst = PIN_LCD_RESET;
+#endif
+  s_gfx = new Arduino_CO5300(s_bus, co5300Rst, BOARD_DISPLAY_ROTATION,
                              LCD_W_PHYS, LCD_H_PHYS, BOARD_CO5300_COL_OFFSET, 0, 0, 0);
 #else
   s_gfx = new Arduino_SH8601(s_bus, GFX_NOT_DEFINED, 0, LCD_W_PHYS, LCD_H_PHYS);

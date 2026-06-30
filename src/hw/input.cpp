@@ -55,6 +55,19 @@ bool hwInputInit() {
   return true;
 #else
   s_iicBus = std::make_shared<Arduino_HWIIC>(PIN_I2C_SDA, PIN_I2C_SCL, &Wire);
+#if BOARD_TOUCH_CST816
+  // CST816 @ 0x15 via Arduino_DriveBus. Same TOUCH_* polling interface as the
+  // FT3168 path below (both are Arduino_IIC subclasses), only the chip class
+  // and I2C address differ. Reset already handled by hwExpanderResetSequence().
+  s_ft3168.reset(new Arduino_CST816x(s_iicBus, CST816T_DEVICE_ADDRESS,
+                                     DRIVEBUS_DEFAULT_VALUE, PIN_TP_INT, onTouchIrq));
+  for (int i = 0; i < 5; i++) {
+    if (s_ft3168->begin()) return true;
+    delay(100);
+  }
+  Serial.println("hwInput: CST816 init failed");
+  return false;
+#else
   s_ft3168.reset(new Arduino_FT3x68(s_iicBus, FT3168_DEVICE_ADDRESS,
                                     DRIVEBUS_DEFAULT_VALUE, PIN_TP_INT, onTouchIrq));
   for (int i = 0; i < 5; i++) {
@@ -63,6 +76,7 @@ bool hwInputInit() {
   }
   Serial.println("hwInput: FT3168 init failed");
   return false;
+#endif
 #endif
 }
 
