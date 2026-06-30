@@ -1,0 +1,65 @@
+name: Firmware Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the GitHub Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ENV_NAME: waveshare-esp32s3-touch-amoled-1-8-v2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO + esptool
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio esptool
+
+      - name: Build firmware
+        run: pio run -e "$ENV_NAME"
+
+      - name: Collect artifacts (+ merged flash image)
+        run: |
+          B=".pio/build/$ENV_NAME"
+          mkdir -p out
+          cp "$B/firmware.bin" "$B/bootloader.bin" "$B/partitions.bin" out/ || true
+          python -m esptool --chip esp32s3 merge_bin \
+            -o "out/${ENV_NAME}-merged.bin" \
+            0x0 "$B/bootloader.bin" 0x8000 "$B/partitions.bin" 0x10000 "$B/firmware.bin" || true
+          ls -la out
+
+      - name: Create GitHub Release with firmware
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
+          body: |
+            Firmware for **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2** (CO5300 + CST816),
+            with the full-text approval screen.
+
+            **Flash a clean device** (merged image):
+            ```
+            esptool.py --chip esp32s3 write_flash 0x0 waveshare-esp32s3-touch-amoled-1-8-v2-merged.bin
+            ```
+            **App only** (already-provisioned device):
+            ```
+            esptool.py --chip esp32s3 write_flash 0x10000 firmware.bin
+            ```
