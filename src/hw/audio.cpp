@@ -20,8 +20,8 @@ extern "C" {
 }
 
 static constexpr int AUDIO_SR  = 16000;
-static constexpr int AUDIO_VOL = 60;
-static constexpr int AUDIO_AMP = 6000;
+static constexpr int AUDIO_VOL = 85;
+static constexpr int AUDIO_AMP = 14000;
 
 static QueueHandle_t s_beepQ = nullptr;
 struct BeepReq { uint16_t freq; uint16_t dur; };
