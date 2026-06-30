@@ -728,7 +728,7 @@ static uint8_t wrapInto(const char* in, char out[][48], uint8_t maxRows, uint8_t
 
 static void drawApproval() {
   const Palette& p = characterPalette();
-  const int AREA = 78;
+  const int AREA = 150;   // tall enough to wrap the full request text
   spr.fillRect(0, H - AREA, W, AREA, p.bg);
   spr.drawFastHLine(0, H - AREA, W, p.textDim);
 
@@ -747,14 +747,17 @@ static void drawApproval() {
   spr.print(tama.promptTool);
   spr.setTextSize(1);
 
-  // Hint wraps at ~21 chars to two lines under the tool name
+  // Hint: hard-wrap at 21 chars across as many lines as fit above the buttons,
+  // so the full request text is readable (not just the first ~42 chars).
   spr.setTextColor(p.textDim, p.bg);
   int hlen = strlen(tama.promptHint);
-  spr.setCursor(SAFE_L, H - AREA + 34);
-  spr.printf("%.21s", tama.promptHint);
-  if (hlen > 21) {
-    spr.setCursor(SAFE_L, H - AREA + 42);
-    spr.printf("%.21s", tama.promptHint + 21);
+  const int LINE_H = 9;
+  const int yLimit = (SAFE_B - 12) - LINE_H;   // keep clear of the A/B row
+  int y = H - AREA + 34;
+  for (int off = 0; off < hlen && y <= yLimit; off += 21) {
+    spr.setCursor(SAFE_L, y);
+    spr.printf("%.21s", tama.promptHint + off);
+    y += LINE_H;
   }
 
   if (responseSent) {
